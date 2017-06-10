@@ -1,11 +1,8 @@
 {
   "name": "redux-store-watch",
   "version": "0.0.1",
-  "description": "A watcher for redux's store.",
+  "description": "A watcher for redux store.",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "keywords": [
     "redux",
     "store",
