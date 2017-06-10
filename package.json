@@ -1,6 +1,6 @@
 {
   "name": "redux-store-watch",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A watcher for redux store.",
   "main": "index.js",
   "keywords": [
