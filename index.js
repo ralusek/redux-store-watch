@@ -33,14 +33,17 @@ class StoreWatcher {
     p(this).unsubscribe = store.subscribe(() => {
       const state = p(this).store.getState();
 
+      const previous = p(this).previous;
+      p(this).previous = state;
+
       for (let path in p(this).watchPaths) {
         const changeListeners = p(this).watchPaths[path];
 
-        const previous = _get(p(this).previous, path);
+        const previousValue = _get(previous, path);
         const current = _get(state, path);
 
-        if (previous !== current) {
-          changeListeners.forEach(changeListener => changeListener(current, previous, state));
+        if (previousValue !== current) {
+          changeListeners.forEach(changeListener => changeListener(current, previousValue, state));
         }
       }
     });
