@@ -5,9 +5,10 @@ const _get = require('hodash.get');
 /**
  *
  */
-export const watchStore = (store) => {
+module.exports = (store) => {
   return new StoreWatcher(store);
 };
+
 
 
 // This establishes a private namespace.
@@ -16,6 +17,7 @@ function p(object) {
   if (!namespace.has(object)) namespace.set(object, {});
   return namespace.get(object);
 }
+
 
 
 /**
@@ -33,7 +35,7 @@ class StoreWatcher {
 
       for (let path in changeListeners) {
         const changeListener = changeListeners[path];
-        
+
         const previous = _get(p(this).previous, path);
         const current = _get(state, path);
 
