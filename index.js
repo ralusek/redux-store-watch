@@ -2,11 +2,21 @@
 
 const _get = require('hodash.get');
 
+const ACTION = 'REDUX_STORE_WATCH_VALUE_CHANGED';
+
 /**
  *
  */
-module.exports = (store) => {
-  return new StoreWatcher(store);
+module.exports = (store, config) => {
+  return new StoreWatcher(store, config);
+};
+
+
+const globalConfig = {};
+module.exports.configureGlobal = (config) => {
+  globalConfig.shouldDispatch = config.shouldDispatch === true;
+  globalConfig.shouldLog = config.shouldLog === true;
+  globalConfig.requireName = config.requireName === true;
 };
 
 
@@ -24,8 +34,16 @@ function p(object) {
  *
  */
 class StoreWatcher {
-  constructor(store) {
+  constructor(store, config) {
+    config = config || {};
+
     p(this).store = store;
+
+    p(this).settings = {
+      shouldDispatch: config.shouldDispatch === true,
+      shouldLog: config.shouldLog === true,
+      requireName: (config.requireName === true) || globalConfig.requireName
+    };
 
     p(this).watchedSelectors = new Map();
 
@@ -65,14 +83,29 @@ class StoreWatcher {
   /**
    * Watch a given string path or a selector's values on store action. Strict
    * equality is used under the assumption that immutable store is employed.
+   * config.checkEqual can optionally be passed if there is a need for something
+   * other than strict equality.
    */
-  watch(pathOrSelector, changeListener) {
+  watch(pathOrSelector, changeListener, config) {
+    config = config || {};
     if (!pathOrSelector) throw new Error('StoreWatcher watch must be provided pathOrSelector.');
     if (!isFunction(changeListener)) throw new Error('StoreWatcher watch must be provided a function changeListener.');
 
+    const handler = {
+      changeListener,
+      checkEqual: config.checkEqual,
+      shouldDispatch: config.shouldDispatch,
+      shouldLog: config.shouldLog,
+      meta: {}
+    };
+
+    let name = config.name;
     // If we've been provided a string, we convert it to a selector.
     if (isString(pathOrSelector)) {
       const path = pathOrSelector;
+      handler.meta.path = path;
+
+      if (!name) name = path;
       const mapping = p(this).pathSelectorMapping;
       // Create or find existing selector for the given path.
       if (!mapping[path]) {
@@ -83,15 +116,19 @@ class StoreWatcher {
       pathOrSelector = mapping[path];
     }
 
-    if (isFunction(pathOrSelector)) {
-      const selector = pathOrSelector;
-      if (!p(this).watchedSelectors.get(selector)) {
-        p(this).watchedSelectors.set(selector, []);
-      }
-      p(this).watchedSelectors.get(selector).push(changeListener);
-      // Set selector result as previous selector value.
-      p(this).previousSelectorValues.set(selector, selector());
+    if (!name && p(this).settings.requireName) throw new Error(`Redux Store Watch .watch defined without name while configured to requireName.`);
+    handler.meta.name = name;
+
+    const selector = pathOrSelector;
+    handler.meta.selector = selector;
+    handler.meta.selectorString = selector.toString();
+    
+    if (!p(this).watchedSelectors.get(selector)) {
+      p(this).watchedSelectors.set(selector, []);
     }
+    p(this).watchedSelectors.get(selector).push(handler);
+    // Set selector result as previous selector value.
+    p(this).previousSelectorValues.set(selector, selector());
   }
 
 
@@ -117,18 +154,25 @@ class StoreWatcher {
  * you may do so.
  */
 function handleSelectorChanges(currentState, previousState) {
-  p(this).watchedSelectors.forEach((changeListeners, selector) => {
+  p(this).watchedSelectors.forEach((handlers, selector) => {
     const currentValue = selector(currentState);
     const previousValue = p(this).previousSelectorValues.get(selector);
 
     // Redefine previous selector's result to reflect current selector.
     p(this).previousSelectorValues.set(selector, currentValue);
 
-    if (previousValue !== currentValue) {
-      changeListeners.forEach(changeListener => {
-        changeListener(currentValue, previousValue, currentState, previousState);
-      });
-    }
+    handlers.forEach(handler => {
+      // Check whether or not the values are equal, using equality checker custom
+      // to handler, else strict equality.
+      const areEqual = handler.checkEqual ? handler.checkEqual(currentValue, previousValue) : (currentValue === previousValue);
+      if (areEqual) return;
+
+      const changeListener = handler.changeListener;
+      const action = {type: ACTION, meta: handler.meta, previousValue, currentValue};
+      if (handler.shouldDispatch || p(this).settings.shouldDispatch || globalConfig.shouldDispatch) p(this).store.dispatch(action);
+      if (handler.shouldLog || p(this).settings.shouldLog || globalConfig.shouldLog) console.log(action);
+      changeListener(currentValue, previousValue, currentState, previousState);
+    });
   });
 }
 
