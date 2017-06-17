@@ -140,6 +140,14 @@ class StoreWatcher {
   remove() {
     p(this).unsubscribe();
   }
+
+
+  /**
+   *
+   */
+  getStore() {
+    return p(this).store || globalConfig.store;
+  }
 }
 
 
