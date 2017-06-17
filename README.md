@@ -23,7 +23,7 @@ const watchStore = require('redux-store-watch');
 
 ##### Import your redux store. Assume imported as `store`.
 
-### Using Redux component as example:
+## Using Redux component as example:
 
 ##### Here is how we would watch some string path's on the store.
 ``` javascript
@@ -117,7 +117,7 @@ class MyComponent extends Component {
 ```
 
 
-### Logging
+## Logging
 Reactive programming of this nature has a lot of benefits, but has the downside
 of often being hard to debug. If I add a watcher on a value change with no
 logging, side effects are occuring that would be very hard to track down.
@@ -133,19 +133,24 @@ including the name, selector, path (if applicable), previous & current values
 will be logged or dispatched as an easy way to track down which watchers have
 been triggered.
 
-One way to enable logging is during a bootstrap process, you could enable it
-globally.
+#### Naming Convention
+A good convention I've found for naming your watcher is:
+
+`{ caller description } << { watched target description }`
+
+For a concrete example, imagine a structure where I had an `auth` reducer somewhere
+in my application, responsible for holding the active user token. In my `Login View`,
+let's say that I'd like to watch the token being set.
 ```
-import watchStore from 'redux-store-watch';
-watchStore.configureGlobal({
-  shouldDispatch: true,
-  shouldLog: true,
-  requireName: true
+watcher.watch('shared.auth.token', (token) => {
+  // Do something about this token.
+}, {
+  name: 'LOGIN_VIEW << AUTH.TOKEN'
 });
 ```
-Configuring globally will apply to all watchers.
 
-To affect an individual watcher:
+
+So to enable logging/dispatching for an individual watcher:
 ```
 const watcher = watchStore(store, {
   shouldDispatch: true,
@@ -153,12 +158,13 @@ const watcher = watchStore(store, {
 });
 ```
 
-To affect an individual watch listener
+To be more fine grained, the same logging/dispatch config is available on a
+per-listener basis.
 ```
-watcher.watch('some.path', () => {
+watcher.watch('shared.user.email', () => {
   // Thing changed!
 }, {
-  name: 'SOME_PATH_WATCHER',
+  name: 'LOGIN_VIEW << USER.EMAIL',
   shouldDispatch: true,
   shouldLog: true
 })
@@ -166,3 +172,27 @@ watcher.watch('some.path', () => {
 
 It is recommended that you use `requireName: true`, and provide names, just
 think how much easier redux is because of its logging!
+
+
+## Global Config
+Global Config allows us to configure logging, dispatching on a global basis,
+shared by all watchers in your application.
+
+You are also able to set the store here, if you have a single store and would
+rather just set it once during your bootstrapping process.
+```
+import watchStore from 'redux-store-watch';
+watchStore.configureGlobal({
+  store,
+  shouldDispatch: true,
+  shouldLog: true,
+  requireName: true
+});
+```
+Now when creating a new watcher I can simply do:
+```
+import watchStore from 'redux-store-watch';
+
+const watcher = watchStore();
+```
+Without providing a store, the watcher will fall back on global.

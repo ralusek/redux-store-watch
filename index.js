@@ -2,18 +2,19 @@
 
 const _get = require('hodash.get');
 
-const ACTION = 'REDUX_STORE_WATCH_VALUE_CHANGED';
+const ACTION = name => 'WATCH_VALUE_CHANGED' + (name ? `: ${name}` : '');
 
 /**
  *
  */
 module.exports = (store, config) => {
-  return new StoreWatcher(store, config);
+  return new StoreWatcher(store || globalConfig.store, config);
 };
 
 
 const globalConfig = {};
 module.exports.configureGlobal = (config) => {
+  globalConfig.store = config.store;
   globalConfig.shouldDispatch = config.shouldDispatch === true;
   globalConfig.shouldLog = config.shouldLog === true;
   globalConfig.requireName = config.requireName === true;
@@ -127,8 +128,9 @@ class StoreWatcher {
       p(this).watchedSelectors.set(selector, []);
     }
     p(this).watchedSelectors.get(selector).push(handler);
-    // Set selector result as previous selector value.
-    p(this).previousSelectorValues.set(selector, selector());
+
+    // Initialize current value of selector as previous value.
+    p(this).previousSelectorValues.set(selector, callSelector(selector, p(this).store.getState()));
   }
 
 
@@ -155,7 +157,7 @@ class StoreWatcher {
  */
 function handleSelectorChanges(currentState, previousState) {
   p(this).watchedSelectors.forEach((handlers, selector) => {
-    const currentValue = selector(currentState);
+    const currentValue = callSelector(selector, currentState);
     const previousValue = p(this).previousSelectorValues.get(selector);
 
     // Redefine previous selector's result to reflect current selector.
@@ -168,7 +170,7 @@ function handleSelectorChanges(currentState, previousState) {
       if (areEqual) return;
 
       const changeListener = handler.changeListener;
-      const action = {type: ACTION, meta: handler.meta, previousValue, currentValue};
+      const action = {type: ACTION(handler.meta.name), meta: handler.meta, previousValue, currentValue};
       if (handler.shouldDispatch || p(this).settings.shouldDispatch || globalConfig.shouldDispatch) p(this).store.dispatch(action);
       if (handler.shouldLog || p(this).settings.shouldLog || globalConfig.shouldLog) console.log(action);
       changeListener(currentValue, previousValue, currentState, previousState);
@@ -187,4 +189,11 @@ function isString(subject) {
 
 function isFunction(subject) {
   return asString.call(subject) == '[object Function]';
+}
+
+function callSelector(selector, state) {
+  try {
+    return selector(state);
+  }
+  catch(err) {}
 }
