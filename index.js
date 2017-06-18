@@ -130,7 +130,8 @@ class StoreWatcher {
     p(this).watchedSelectors.get(selector).push(handler);
 
     // Initialize current value of selector as previous value.
-    p(this).previousSelectorValues.set(selector, callSelector(selector, p(this).store.getState()));
+    if (config.initializeValue !== false)
+        p(this).previousSelectorValues.set(selector, callSelector(selector, p(this).store.getState()));
   }
 
 
